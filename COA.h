@@ -54,17 +54,17 @@ and stuff
                                                                        \
 /* ___________________________________________Function Declarations */ \
     /* need to test if makeheaders.c can detect and declare these */   \
-    void popDeckStart_##type (type *xref, Deck_##type* pile);          \
-    void pushDeckStart_##type (type *xref, Deck_##type* pile);         \
-    void popDeckEnd_##type (type *xref, Deck_##type* pile);            \
-    void pushDeckEnd_##type (type *xref, Deck_##type* pile);           \
+    void popStart_Deck_##type (type *xref, Deck_##type* pile);         \
+    void pushStart_Deck_##type (type *xref, Deck_##type* pile);        \
+    void popEnd_Deck_##type (type *xref, Deck_##type* pile);           \
+    void pushEnd_Deck_##type (type *xref, Deck_##type* pile);          \
                                                                        \
 /* _____________________________________________Helper Declarations */ \
     /* need to test if makeheaders.c can detect and declare these */   \
                                                                        \
 /* ____________________________________________Deck Implementation */  \
                                                                        \
-    void popDeckStart_##type (type *xref, Deck_##type* pile) {         \
+    void popStart_Deck_##type (type *xref, Deck_##type* pile) {        \
         assert(pile != NULL);                                          \
         assert(pile->size > 0);                                        \
         LLNode_##type* tmp = pile->Start;                              \
@@ -78,7 +78,7 @@ and stuff
         /*return data_buf;*/                                           \
     }                                                                  \
                                                                        \
-    void popDeckEnd_##type (type *xref, Deck_##type* pile) {           \
+    void popEnd_Deck_##type (type *xref, Deck_##type* pile) {          \
         assert(pile != NULL);                                          \
         assert(pile->size > 0);                                        \
         LLNode_##type* tmp = pile->End;                                \
@@ -91,7 +91,7 @@ and stuff
         if (pile->size <= 1) pile->End = pile->Start;                  \
     }                                                                  \
                                                                        \
-    void pushDeckStart_##type (type *xref, Deck_##type* pile) {        \
+    void pushStart_Deck_##type (type *xref, Deck_##type* pile) {       \
         assert(pile != NULL);                                          \
         LLNode_##type* new_start = zalloc(sizeof( LLNode_##type ));    \
         if (xref != NULL){                                             \
@@ -102,7 +102,7 @@ and stuff
         if (pile->size <= 1) pile->End = pile->Start;                  \
     }                                                                  \
                                                                        \
-    void pushDeckEnd_##type (type *xref, Deck_##type* pile) {          \
+    void pushEnd_Deck_##type (type *xref, Deck_##type* pile) {         \
         assert(pile != NULL);                                          \
         LLNode_##type* new_end = zalloc(sizeof( LLNode_##type ));      \
         if (xref != NULL){                                             \
@@ -135,14 +135,14 @@ typedef struct CA_##type {                                             \
                                                                        \
 /* ___________________________________________Function Declarations */ \
                                                                        \
-void CA_popStart_##type (type *xref, CA_##type *deque);                \
-void CA_pushStart_##type(type *xref, CA_##type *deque);                \
-void CA_popEnd_##type (type *xref, CA_##type *deque);                  \
-void CA_pushEnd_##type(type *xref, CA_##type *deque);                  \
+void popStart_CA_##type (type *xref, CA_##type *deque);                \
+void pushStart_CA_##type(type *xref, CA_##type *deque);                \
+void popEnd_CA_##type (type *xref, CA_##type *deque);                  \
+void pushEnd_CA_##type(type *xref, CA_##type *deque);                  \
                                                                        \
 /* ________________________________________Function Implementations */ \
                                                                        \
-void CA_pushStart_##type(type *xref, CA_##type *deque) {               \
+void pushStart_CA_##type(type *xref, CA_##type *deque) {               \
     assert(deque->size < CA_size);                                     \
     deque->start_offset =                                              \
         (deque->start_offset - 1 + CA_size) % CA_size;                 \
@@ -150,7 +150,7 @@ void CA_pushStart_##type(type *xref, CA_##type *deque) {               \
     deque->size++;                                                     \
 }                                                                      \
                                                                        \
-void CA_popStart_##type (type *xref, CA_##type *deque) {               \
+void popStart_CA_##type (type *xref, CA_##type *deque) {               \
     assert(deque->size > 0);                                           \
     if (xref != NULL){                                                 \
         *xref = deque->data[deque->start_offset];}                     \
@@ -158,14 +158,14 @@ void CA_popStart_##type (type *xref, CA_##type *deque) {               \
     deque->size--;                                                     \
 }                                                                      \
                                                                        \
-void CA_pushEnd_##type(type *xref, CA_##type *deque) {                 \
+void pushEnd_CA_##type(type *xref, CA_##type *deque) {                 \
     assert(deque->size < CA_size);                                     \
     deque->data[deque->end_offset] = *xref;                            \
     deque->end_offset = (deque->end_offset + 1) % CA_size;             \
     deque->size++;                                                     \
 }                                                                      \
                                                                        \
-void CA_popEnd_##type (type *xref, CA_##type *deque) {                 \
+void popEnd_CA_##type (type *xref, CA_##type *deque) {                 \
     assert(deque->size > 0);                                           \
     deque->end_offset = (deque->end_offset                             \
                         - 1 + CA_size) % CA_size;                      \
@@ -199,25 +199,11 @@ void CA_popEnd_##type (type *xref, CA_##type *deque) {                 \
 // 
 /* ________________________________________________________________ */
 
-
-#define DEFINE_COA(type, CA_size)                                      \
-    DEFINE_CIRCARRAY(type, CA_size)                                    \
-    /* DEFINE_CIRCARRAY defines CA_type for that type */               \
-    rundeck(CA_##type)                                                 \
-
-#define rundeck(type) \
-    rundeck_internal(type)
-
-#define rundeck_internal(type) \
-    #if defined(type) \
-        DEFINE_DECK(type)                                              \
-    #endif
-
-#define DEFINE_COD(type)                                               \
+#define DEFINE_COD(Deck_CA_type, CA_type, type, CA_size)               \
                                                                        \
     typedef struct COA_##type {                                        \
         uint64_t size; /* not the num of nodes but num of elems */     \
-        struct Deck_CA_##type * pile;                                  \
+        struct Deck_CA_type * pile;                                    \
     } COA_##type;                                                      \
                                                                        \
 void COA_popStart_##type(type *xref, COA_##type* cluster);             \
@@ -229,39 +215,66 @@ COA_##type* New_COA_##type ();                                         \
 void COA_popStart_##type(type *xref, COA_##type* cluster);             \
     assert(cluster->size > 0);                                         \
     if (cluster->pile->Start->data->size == 0)                         \
-        popDeckStart_##type(NULL, cluster->pile);                      \
-    *xref = CA_popStart_##type( cluster->pile->Start->data );          \
+        popStart_##Deck_CA_type(NULL, cluster->pile);                  \
+    popStart_##CA_type(xref, cluster->pile->Start->data );             \
     cluster->size--;                                                   \
 }                                                                      \
                                                                        \
 void COA_popEnd_##type(type *xref, COA_##type* cluster);               \
     assert(cluster->size > 0);                                         \
     if (cluster->pile->End->data->size == 0)                           \
-        popDeckEnd_##type(NULL, cluster->pile);                        \
-    *xref = CA_popEnd_##type( cluster->pile->End->data );              \
+        popEnd_##Deck_CA_type(NULL, cluster->pile);                    \
+    popEnd_##CA_type(xref, cluster->pile->End->data );                 \
     cluster->size--;                                                   \
 }                                                                      \
                                                                        \
 void COA_pushStart_##type(type *xref, COA_##type* cluster);            \
     if (cluster->pile->Start->data->size == CA_size)                   \
-        pushDeckStart_##type(NULL, cluster->pile);                     \
-    CA_pushStart_##type( cluster->pile->Start->data, value );          \
+        pushStart_##Deck_CA_type(NULL, cluster->pile);                 \
+    pushStart_##CA_type(xref, cluster->pile->Start->data );            \
     cluster->size++;                                                   \
 }                                                                      \
                                                                        \
 void COA_pushEnd_##type(type *xref, COA_##type* cluster);              \
     if (cluster->pile->End->data->size == CA_size)                     \
-        pushDeckEnd_##type(NULL, cluster->pile);                       \
-    CA_pushEnd_##type( cluster->pile->End->data, value );              \
+        pushEnd_##Deck_CA_type(NULL, cluster->pile);                   \
+    pushEnd_##CA_type(xref, cluster->pile->End->data);                 \
     cluster->size++;                                                   \
 }                                                                      \
                                                                        \
 COA_##type* New_COA_##type () {                                        \
-    COA_##type* cluster = zalloc(sizeof(Deck_##type));                 \
-    cluster->pile = New_Deck_CA_##type ();                             \
-    pushDeckStart_CA_##type (NULL, cluster->pile);                     \
+    COA_##type* cluster = zalloc(sizeof(COA_##type));                  \
+    cluster->pile = zalloc(sizeof(Deck_CA_type));                      \
+    pushStart_##Deck_CA_type (NULL, cluster->pile);                    \
     return cluster;                                                    \
 }                                                                      \
                                                                        \
 /* realize consolodation */                                            \
 // CA_##type* CA_zerobuf_##type = New_CA_##type();
+
+#define STRINGIFY_HELPER(x) #x
+#define STRINGIFY(x) STRINGIFY_HELPER(x)
+
+#define CONCAT_HELPER(x, y) x##y
+#define CONCAT(x, y) CONCAT_HELPER(x, y)
+
+#define DEFINE_SETnUSEvars_HELPER(type, CA_size)                       \
+    #define CA_type STRINGIFY(CA_##type)                               \
+    #define Deck_CA_type STRINGIFY(Deck_CA_##type)                     \
+    /* DEFINE_COD defines funcs that operate on Deck_CA_type */        \
+    DEFINE_COD(Deck_CA_type, CA_type, type, CA_size)                   \
+    #undef CA_type                                                     \
+    #undef Deck_CA_type
+
+#define DEFINE_SETnUSEvars(type, CA_size) \
+    DEFINE_SETnUSEvars_HELPER(type, CA_size)
+
+#define DEFINE_COA(type, CA_size)                                      \
+    /* DEFINE_CIRCARRAY defines CA_type for that type */               \
+    DEFINE_CIRCARRAY(type, CA_size)                                    \
+    /* DEFINE_DECK defines Deck_CA_type for that type */               \
+    DEFINE_DECK(CA_##type)                                             \
+    /* DEFINE_COD correctly called in this macro */                    \
+
+//    DEFINE_SETnUSEvars(type, CA_size)
+

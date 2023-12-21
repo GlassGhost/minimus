@@ -44,8 +44,8 @@ and the offsets are adjusted accordingly.
 #endif
 
 #include "COA.h"
-DEFINE_CIRCARRAY(uint8_t, 95) //(152*5)/8 // 4x content to metadata for 64 bit addresses
-// DEFINE_COA(uint8_t, 95) //(152*5)/8 // 4x content to metadata for 64 bit addresses
+// DEFINE_CIRCARRAY(uint8_t, 45)
+DEFINE_COA(uint8_t, 45)
 // #undef DEFINE_DECK
 
 /* __________________________________________Helper Implementations */
@@ -56,18 +56,27 @@ int64_t main(int argc, char **argv){// *argv++ is *((char **)(argv++))
     uint8_t* intbufptr = (uint8_t*)zalloc(sizeof(uint8_t));
     // Pushing values onto the deque
     *intbufptr = 42;
-    CA_pushStart_uint8_t(intbufptr, deque);
+    pushStart_CA_uint8_t(intbufptr, deque);
     *intbufptr = 17;
-    CA_pushEnd_uint8_t(intbufptr, deque);
+    pushEnd_CA_uint8_t(intbufptr, deque);
     *intbufptr = 33;
-    CA_pushStart_uint8_t(intbufptr, deque);
+    pushStart_CA_uint8_t(intbufptr, deque);
 
     // Popping values from the deque
-    CA_popStart_uint8_t(intbufptr, deque);
+    popStart_CA_uint8_t(intbufptr, deque);
     printf("Popped from start: %u\n", *intbufptr);
-    CA_popEnd_uint8_t(intbufptr, deque);
+    popEnd_CA_uint8_t(intbufptr, deque);
     printf("Popped from end: %u\n", *intbufptr);
-    CA_popEnd_uint8_t(intbufptr, deque);
+    popEnd_CA_uint8_t(intbufptr, deque);
     printf("Popped from end: %u\n", *intbufptr);
+    Deck_CA_uint8_t* pile = zalloc(sizeof(Deck_CA_uint8_t));
+    
+    *intbufptr = sizeof(CA_uint8_t);
+    printf("sizeof CA_uint8_t: %u\n", *intbufptr);
+    *intbufptr = sizeof(LLNode_CA_uint8_t);
+    printf("sizeof LLNode_CA_uint8_t: %u\n", *intbufptr);
+    *intbufptr = sizeof(Deck_CA_uint8_t);
+    printf("sizeof Deck_CA_uint8_t: %u\n", *intbufptr);
+
     return 0;
 }
