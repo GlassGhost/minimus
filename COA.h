@@ -142,7 +142,7 @@ void pushEnd_CA_##type(type *xref, CA_##type *deque);                  \
                                                                        \
 /* ________________________________________Function Implementations */ \
                                                                        \
-void pushStart_CA_##type(type *xref, CA_##type *deque) {               \
+void pushStart_CA_##type (type *xref, CA_##type *deque) {               \
     assert(deque->size < CA_size);                                     \
     deque->start_offset =                                              \
         (deque->start_offset - 1 + CA_size) % CA_size;                 \
@@ -158,7 +158,7 @@ void popStart_CA_##type (type *xref, CA_##type *deque) {               \
     deque->size--;                                                     \
 }                                                                      \
                                                                        \
-void pushEnd_CA_##type(type *xref, CA_##type *deque) {                 \
+void pushEnd_CA_##type (type *xref, CA_##type *deque) {                 \
     assert(deque->size < CA_size);                                     \
     deque->data[deque->end_offset] = *xref;                            \
     deque->end_offset = (deque->end_offset + 1) % CA_size;             \
@@ -215,30 +215,30 @@ COA_##type* New_COA_##type ();                                         \
 void COA_popStart_##type(type *xref, COA_##type* cluster);             \
     assert(cluster->size > 0);                                         \
     if (cluster->pile->Start->data->size == 0)                         \
-        popStart_##Deck_CA_type(NULL, cluster->pile);                  \
-    popStart_##CA_type(xref, cluster->pile->Start->data );             \
+        popStart_##Deck_CA_type (NULL, cluster->pile);                  \
+    popStart_##CA_type (xref, cluster->pile->Start->data );             \
     cluster->size--;                                                   \
 }                                                                      \
                                                                        \
-void COA_popEnd_##type(type *xref, COA_##type* cluster);               \
+void COA_popEnd_##type (type *xref, COA_##type* cluster);               \
     assert(cluster->size > 0);                                         \
     if (cluster->pile->End->data->size == 0)                           \
-        popEnd_##Deck_CA_type(NULL, cluster->pile);                    \
-    popEnd_##CA_type(xref, cluster->pile->End->data );                 \
+        popEnd_##Deck_CA_type (NULL, cluster->pile);                    \
+    popEnd_##CA_type (xref, cluster->pile->End->data );                 \
     cluster->size--;                                                   \
 }                                                                      \
                                                                        \
-void COA_pushStart_##type(type *xref, COA_##type* cluster);            \
+void COA_pushStart_##type (type *xref, COA_##type* cluster);            \
     if (cluster->pile->Start->data->size == CA_size)                   \
-        pushStart_##Deck_CA_type(NULL, cluster->pile);                 \
-    pushStart_##CA_type(xref, cluster->pile->Start->data );            \
+        pushStart_##Deck_CA_type (NULL, cluster->pile);                 \
+    pushStart_##CA_type (xref, cluster->pile->Start->data );            \
     cluster->size++;                                                   \
 }                                                                      \
                                                                        \
-void COA_pushEnd_##type(type *xref, COA_##type* cluster);              \
+void COA_pushEnd_##type (type *xref, COA_##type* cluster);              \
     if (cluster->pile->End->data->size == CA_size)                     \
-        pushEnd_##Deck_CA_type(NULL, cluster->pile);                   \
-    pushEnd_##CA_type(xref, cluster->pile->End->data);                 \
+        pushEnd_##Deck_CA_type (NULL, cluster->pile);                   \
+    pushEnd_##CA_type (xref, cluster->pile->End->data);                 \
     cluster->size++;                                                   \
 }                                                                      \
                                                                        \
