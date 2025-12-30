@@ -60,21 +60,6 @@ LLDeck_CA_coord_255 *emptyspaces;
     pushStart_CALLDECK_coord_255(&SomeSegment, &snake);
     popStart_CALLDECK_coord_255(&SomeSegment, &snake));
     pushStart_CALLDECK_coord_255(&SomeSegment, &snake);
-
-for (uint16_t i = 0; i < snake_length; i++) {
-    SnakeSegment seg;
-    popStart_CALLDECK_coord_255(&seg, &snake);
-    // --- Add your segment-handling code here ---
-    pushEnd_CALLDECK_coord_255(&seg, &snake);
-}
-
-for (uint16_t i = 0; i < apple_count; i++) {
-    Apple a;
-    popStart_CALLDECK_Apple_255(&a, &apples);
-    if (collision){
-        apple_count--;
-    } else pushEnd_CALLDECK_Apple_255(&a, &apples);
-}
 */
 
 const uint8_t framerate = 60;
@@ -129,14 +114,14 @@ int main(int argc, char **argv) {
     uint8_t *snake_world = malloc(width * height);
     if (!snake_world) { endwin(); return 1; } // exit if error
 
+    coord snake_head_new;
+
     SnakeSegment initial_head = { width / 2, height / 2 };
     snake_world[initial_head.y * width + initial_head.x] = 1;
     
     for (;;) {
         // Handle input for direction changes
         handle_input(&direction_x, &direction_y);
-
-        // --- NEW UPDATE‑WORLD SECTION USING UNIFIED coord TYPE ---
 
         // update world only on certain frames
         if (frame_count >= framerate / moves_per_second) {
@@ -145,23 +130,25 @@ int main(int argc, char **argv) {
             memset(snake_world, emptychar, width * height);
             coord snake_head_current;
             if (popStart_CALLDECK_coord_255(&snake_head_current, &snake)) {
-
                 // restore head
                 pushStart_CALLDECK_coord_255(&snake_head_current, &snake);
 
                 // compute new head
-                coord snake_head_new = snake_head_current;
-                snake_head_new.x = (snake_head_new.x + direction_x + width) % width;
-                snake_head_new.y = (snake_head_new.y + direction_y + height) % height;
-
+                snake_head_new.x = (snake_head_current.x + direction_x + width) % width;
+                snake_head_new.y = (snake_head_current.y + direction_y + height) % height;
                 bool ate_apple = false;
+
                 for (uint16_t i = 0; i < apple_count; i++) {
                     coord apple_coord;
                     popStart_CALLDECK_coord_255(&apple_coord, &apples);
-                    // if (apple_coord == snake_head_new) ate_apple = true;
-                    if (memcmp(&apple_coord, &snake_head_new, sizeof(coord)) == 0) ate_apple = true;
-                    pushEnd_CALLDECK_coord_255(&apple_coord, &apples);
+                    if (memcmp(&apple_coord, &snake_head_new, sizeof(coord)) == 0) {
+                        ate_apple = true;
+                        // Do NOT push it back; it's eaten.
+                    } else {
+                        pushEnd_CALLDECK_coord_255(&apple_coord, &apples);
+                    }
                 }
+
                 // push new head
                 pushStart_CALLDECK_coord_255(&snake_head_new, &snake);
 
@@ -178,11 +165,16 @@ int main(int argc, char **argv) {
                 for (uint8_t x = 0; x < width; ++x)
                     snake_world[y * width + x] = emptychar;
 
-            // draw snake
+            // draw snake or detect game over
             for (uint16_t i = 0; i < snake_length; i++) {
                 coord snake_seg;
                 popStart_CALLDECK_coord_255(&snake_seg, &snake);
-                snake_world[snake_seg.y * width + snake_seg.x] = snakechar;
+                // Skip the first segment (the new head) to avoid self-collision with self
+                if (i > 0 && memcmp(&snake_seg, &snake_head_new, sizeof(coord)) == 0) {
+                    endwin();
+                    printf("Game Over! Snake collided with itself.\n");
+                    exit(0);
+                }                snake_world[snake_seg.y * width + snake_seg.x] = snakechar;
                 pushEnd_CALLDECK_coord_255(&snake_seg, &snake);
             }
 
@@ -212,20 +204,20 @@ int main(int argc, char **argv) {
             // spawn apple
             apple_spawn_timer++;
             if (apple_spawn_timer >= moves_per_second && space_count > 0) {
-
                 uint16_t r = rand() % space_count;
-
                 coord chosen_space;
-                for (uint16_t i = 0; i <= r; i++) {
+                // Cycle through to the random index
+                for (uint16_t i = 0; i < r; i++) {
                     popStart_CALLDECK_coord_255(&chosen_space, &emptyspaces);
                     pushEnd_CALLDECK_coord_255(&chosen_space, &emptyspaces);
                 }
-
+                // Pull the chosen one out permanently from emptyspaces
                 popStart_CALLDECK_coord_255(&chosen_space, &emptyspaces);
+                // Add it to apples
                 pushStart_CALLDECK_coord_255(&chosen_space, &apples);
 
                 apple_count++;
-                space_count--;
+                // space_count--; // Optional: space_count is rebuilt every frame anyway
                 apple_spawn_timer = 0;
             }
         }
