@@ -66,8 +66,8 @@ const uint8_t framerate = 60;
 const uint8_t snakechar = '#';
 const uint8_t applechar = '@';
 const uint8_t emptychar = ' ';
-const uint8_t width = 20;
-const uint8_t height = 20;
+const uint8_t width = 40;
+const uint8_t height = 40;
 const uint8_t moves_per_second = 8;
 const uint32_t apple_spawn_interval = 60;  // 1 second at 60fps for testing (was 300 for 5 seconds)
 
