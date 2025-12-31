@@ -23,7 +23,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 /* build, run, and destroy with:
-gcc -m64 -O2 -std=gnu99 CATest.c -o CATest && ./CATest && rm ./CATest
+gcc -m64 -O2 -std=gnu99 Pithon.c -o Pithon && ./Pithon && rm ./Pithon
 
 or just uncomment the tcc shebang
 */
@@ -71,11 +71,35 @@ const uint8_t height = 40;
 const uint8_t moves_per_second = 8;
 const uint32_t apple_spawn_interval = 60;  // 1 second at 60fps for testing (was 300 for 5 seconds)
 
-// Direction control variables
-int8_t direction_x = 1;  // Start moving right
+int8_t direction_x = 1; // Direction control variables
 int8_t direction_y = 0;
 
-void handle_input(int8_t *direction_x, int8_t *direction_y);
+// process arrow key presses
+void handle_input(int8_t *direction_x, int8_t *direction_y) {
+    int ch = getch();
+    
+    if (ch != ERR) {  // Key was pressed
+        int8_t new_dx = *direction_x;
+        int8_t new_dy = *direction_y;
+        
+        switch (ch) {
+            case KEY_UP: new_dx = 0; new_dy = -1; break;
+            case KEY_DOWN: new_dx = 0; new_dy = 1; break;
+            case KEY_LEFT: new_dx = -1; new_dy = 0; break;
+            case KEY_RIGHT: new_dx = 1; new_dy = 0; break;
+            default:
+                return; // Ignore other keys
+        }
+        
+        // Direction change validation - prevent reverse movement
+        // Don't allow moving in the exact opposite direction
+        if (new_dx != -*direction_x || new_dy != -*direction_y) {
+            *direction_x = new_dx;
+            *direction_y = new_dy;
+        }
+    }
+}
+
 void sleepframetime() {
     nanosleep(&(struct timespec){ .tv_sec = 0, .tv_nsec = 1000000000L / framerate }, NULL);
 }
@@ -156,7 +180,9 @@ int main(int argc, char **argv) {
                     snake_length++;
                     apple_count--;
                 } else {
-                    popEnd_CALLDECK_coord_255(&snake_head_new, &snake);
+                    coord dummy;
+                    popEnd_CALLDECK_coord_255(&dummy, &snake); // fix error from overwrites snake_head_new
+                    // popEnd_CALLDECK_coord_255(&snake_head_new, &snake);   // overwrites snake_head_new
                 }
             }
 
@@ -174,7 +200,8 @@ int main(int argc, char **argv) {
                     endwin();
                     printf("Game Over! Snake collided with itself.\n");
                     exit(0);
-                }                snake_world[snake_seg.y * width + snake_seg.x] = snakechar;
+                }
+                snake_world[snake_seg.y * width + snake_seg.x] = snakechar;
                 pushEnd_CALLDECK_coord_255(&snake_seg, &snake);
             }
 
@@ -245,42 +272,3 @@ int main(int argc, char **argv) {
     free(snake_world);
     return 0;
 }
-
-// Input handling function to process arrow key presses
-void handle_input(int8_t *direction_x, int8_t *direction_y) {
-    int ch = getch();
-    
-    if (ch != ERR) {  // Key was pressed
-        int8_t new_dx = *direction_x;
-        int8_t new_dy = *direction_y;
-        
-        switch (ch) {
-            case KEY_UP:
-                new_dx = 0;
-                new_dy = -1;
-                break;
-            case KEY_DOWN:
-                new_dx = 0;
-                new_dy = 1;
-                break;
-            case KEY_LEFT:
-                new_dx = -1;
-                new_dy = 0;
-                break;
-            case KEY_RIGHT:
-                new_dx = 1;
-                new_dy = 0;
-                break;
-            default:
-                return; // Ignore other keys
-        }
-        
-        // Direction change validation - prevent reverse movement
-        // Don't allow moving in the exact opposite direction
-        if (new_dx != -*direction_x || new_dy != -*direction_y) {
-            *direction_x = new_dx;
-            *direction_y = new_dy;
-        }
-    }
-}
-
