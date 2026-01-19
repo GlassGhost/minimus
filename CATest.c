@@ -1,4 +1,4 @@
-#!/run/current-system/sw/bin/tcc -run
+// #!/run/current-system/sw/bin/tcc -run
 
 // Copyright (C) 2023-2025 Roy Pfund. All rights reserved.
 //
@@ -39,38 +39,6 @@ or just uncomment the tcc shebang
 // Unsigned // %"PRIu8"   // %"PRIu16"   // %"PRIu32"   // %"PRIu64"
 // Float    //  XXXXXX    //   XXXXXX    //   %.6E      // %.15E
 
-/*
-
-## Passing a pointer
-
-```c
-void foo(MyStruct *p) {
-    p = NULL;   // Only changes the local copy
-}
-```
-
-Because `p` itself is passed **by value**, so assigning `p = NULL` only overwrites the local copy.
-This **CANNOT** affect the caller’s pointer. The caller still has the original pointer value, unchanged.
-You *can* modify the struct’s contents (`p->field = ...`), but you cannot change the caller’s pointer.
-
----
-
-## Passing a pointer to a pointer (`MyStruct **p`)
-Now the function receives a pointer to the caller’s pointer.
-
-```c
-void foo(MyStruct **p) {
-    *p = NULL;   // This modifies the caller's pointer
-}
-```
-
-This **CAN** change the caller’s pointer, because you are dereferencing and writing to the original pointer.
-
-> *We cannot set the pointer to NULL in the first version.*
-
-*/
-
-// #define MALLOC_FAIL 1
 
 typedef enum { SUCCESS = 0, FULL = 1, EMPTY = 2, MALLOC_FAIL = 3 } fail_status_t;
 
@@ -279,16 +247,16 @@ static void test(int argc, char **argv) {
     printf("\n===== TEST 1a: pushEnd 200, popStart 199 =====\n");
     testPushEnd(&dq, 200);
     testPopStart(&dq, 199);
-    printf("Current Deque pointer: %016"PRIX64"\n", dq);
+    printf("Current Deque pointer: %016"PRIX64"\n", (void*)dq);
 
-    printf("\n===== TEST 1b: pushEnd 200, popStart 200 =====\n");
     testPushEnd(&dq, 200);
     testPopStart(&dq, 200);
+    printf("Current Deque pointer: %016"PRIX64"\n", (void*)dq);
+
     testPushEnd(&dq, 255);
     testPopStart(&dq, 255);
     testPopStart(&dq, 1);
-    printf("Deque pointer after emptying: %p\n", (void*)dq);
-    printf("Current Deque pointer: %016"PRIX64"\n", dq);
+    printf("Deque pointer after emptying: %016"PRIX64"\n", (void*)dq);
 
     printf("\n===== TEST 1c: pushStart 200, popEnd 200 =====\n");
     testPushStart(&dq, 200);
@@ -299,7 +267,8 @@ static void test(int argc, char **argv) {
     testPopEnd(&dq, 255);
     testPopEnd(&dq, 1);
 
-    printf("Deque pointer after emptying: %p\n", (void*)dq);
+    printf("Current Deque pointer: %016"PRIX64"\n", (void*)dq);
+    // printf("Deque pointer after emptying: %p\n", (void*)dq);
 
     test2(&dq);
 
@@ -316,7 +285,7 @@ int64_t main(int argc, char **argv){// *argv++ is *((char **)(argv++))
 }
 
 /* 
-$ ./CATest.c 
+$ gcc -m64 -O2 -std=gnu99 CATest.c -o CATest && ./CATest && rm ./CATest
 
 ===== TEST 1a: pushEnd 200, popStart 199 =====
 
@@ -325,15 +294,14 @@ After pushEnd: size=199 start=0
 
 [testPopStart] popping 199 values...
 After popStart: size=0 start=199
-Current Deque pointer: 000055965A415F40
-
-===== TEST 1b: pushEnd 200, popStart 200 =====
+Current Deque pointer: 00005612FCBB76B0
 
 [testPushEnd] pushing 200 values...
 After pushEnd: size=200 start=199
 
 [testPopStart] popping 200 values...
 After popStart: size=0 start=143
+Current Deque pointer: 00005612FCBB76B0
 
 [testPushEnd] pushing 255 values...
 After pushEnd: size=255 start=143
@@ -343,8 +311,7 @@ After popStart: size=0 start=142
 
 [testPopStart] popping 1 values...
 After popStart: size=0 start=0
-Deque pointer after emptying: (nil)
-Current Deque pointer: 0000000000000000
+Deque pointer after emptying: 0000000000000000
 
 ===== TEST 1c: pushStart 200, popEnd 200 =====
 
@@ -368,7 +335,7 @@ After popEnd: size=0 start=114
 
 [testPopEnd] popping 1 values...
 After popEnd: size=0 start=0
-Deque pointer after emptying: (nil)
+Current Deque pointer: 0000000000000000
 
 ===== TEST 2: FAIL INTENTIONALLY =====
 
