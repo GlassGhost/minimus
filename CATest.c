@@ -39,17 +39,40 @@ or just uncomment the tcc shebang
 // Unsigned // %"PRIu8"   // %"PRIu16"   // %"PRIu32"   // %"PRIu64"
 // Float    //  XXXXXX    //   XXXXXX    //   %.6E      // %.15E
 
-
 typedef enum { SUCCESS = 0, FULL = 1, EMPTY = 2, MALLOC_FAIL = 3 } fail_status_t;
 
-#define DEFINE_CIRCARRAY_MEM(type, CA_size, CAPACITY)                              \
-inline void FREE_CA_##type##_##CA_size ( CA_##type##_##CA_size **dq_p ){           \
-    free(*dq_p); *dq_p = NULL;                                                     \
-}                                                                                  \
-inline bool ALLOC_CA_##type##_##CA_size ( CA_##type##_##CA_size **dq_p ){          \
-    *dq_p = calloc(1, sizeof(CA_##type##_##CA_size));                              \
-    if (!(*dq_p)) return MALLOC_FAIL; else return false;                           \
+#define DEFINE_CIRCARRAY_MEM(type, CA_size, CAPACITY)                                  \
+/*_____ ___________________________________________Helper_Functions */                 \
+static inline bool is_empty_CA_##type##_##CA_size(const CA_##type##_##CA_size **dq_p) { \
+    return (*dq_p == NULL);                                                            \
+}                                                                                      \
+static inline bool is_full_CA_##type##_##CA_size(const CA_##type##_##CA_size **dq_p) { \
+    return ((*dq_p)->size == CA_size);                                                 \
+}                                                                                      \
+static inline fail_status_t Ful_Emp_CA_##type##_##CA_size(                             \
+        type *dest, CA_##type##_##CA_size **dq_p) {                                    \
+    if (*dq_p == NULL) return EMPTY;                                                   \
+    if ((*dq_p)->size == CA_size) return FULL;                                         \
+    return SUCCESS; /* Otherwise neither full nor empty */                             \
+}                                                                                      \
+inline void FREE_CA_##type##_##CA_size ( CA_##type##_##CA_size **dq_p ){               \
+    free(*dq_p); *dq_p = NULL;                                                         \
+}                                                                                      \
+inline bool ALLOC_CA_##type##_##CA_size ( CA_##type##_##CA_size **dq_p ){              \
+    *dq_p = calloc(1, sizeof(CA_##type##_##CA_size));                                  \
+    if (!(*dq_p)) return MALLOC_FAIL; else return false;                               \
 }
+
+/*
+ * CIRCARRAY EMPTY SIZE ENCODING:
+ *   dq == NULL → 0 elements
+ *   dq->size is an encoded count where:
+ *       size = 0 → 1 element
+ *       size = 1 → 2 elements
+ *       ...
+ *       size = 255 → 256 elements
+ *   Therefore, ONLY a NULL pointer means empty.
+ */
 
 #define DEFINE_CIRCARRAY(type, CA_size)              \
 DEFINE_CIRCARRAY_STRUCTS(type, CA_size, (CA_size+1)) \
@@ -75,12 +98,12 @@ fail_status_t popEnd_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **d
                                                                                      \
 /* ___________________________________________Function Implementation */             \
 fail_status_t pushStart_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size **dq_p) { \
-    if (*dq_p == NULL) { /* push 1st = 0th elem */                                   \
-        if (ALLOC_CA_##type##_##CA_size (dq_p)) return FULL; /* alloc fail */        \
+    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) {       \
+        if (ALLOC_CA_##type##_##CA_size(dq_p)) return FULL;                          \
         (*dq_p)->data[0] = *source;                                                  \
         return SUCCESS;                                                              \
     }                                                                                \
-    if ((*dq_p)->size == CA_size) return FULL; /* array full */                      \
+    if (is_full_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return FULL; \
     (*dq_p)->start_offset = ((*dq_p)->start_offset + CAPACITY - 1) % CAPACITY;       \
     (*dq_p)->data[(*dq_p)->start_offset] = *source;                                  \
     (*dq_p)->size++;                                                                 \
@@ -88,12 +111,12 @@ fail_status_t pushStart_CA_##type##_##CA_size(type *source, CA_##type##_##CA_siz
 }                                                                                    \
                                                                                      \
 fail_status_t pushEnd_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size **dq_p) { \
-    if (*dq_p == NULL) { /* push 1st = 0th elem */                                   \
-        if (ALLOC_CA_##type##_##CA_size (dq_p)) return FULL; /* alloc fail */        \
+    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) {       \
+        if (ALLOC_CA_##type##_##CA_size(dq_p)) return FULL;                          \
         (*dq_p)->data[0] = *source;                                                  \
         return SUCCESS;                                                              \
     }                                                                                \
-    if ((*dq_p)->size == CA_size) return FULL; /* array full */                      \
+    if (is_full_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return FULL; \
     uint8_t end_index = ((*dq_p)->start_offset + (*dq_p)->size + 1) % CAPACITY;      \
     (*dq_p)->data[end_index] = *source;                                              \
     (*dq_p)->size++;                                                                 \
@@ -101,24 +124,30 @@ fail_status_t pushEnd_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size 
 }                                                                                    \
                                                                                      \
 fail_status_t popStart_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **dq_p) { \
-    if (*dq_p == NULL) return EMPTY; /* fail on empty */                             \
+    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return EMPTY; \
     *dest = (*dq_p)->data[(*dq_p)->start_offset];                                    \
     (*dq_p)->start_offset = ((*dq_p)->start_offset + 1) % CAPACITY;                  \
     if (!((*dq_p)->size == 0)) (*dq_p)->size--;                                      \
-    else FREE_CA_##type##_##CA_size (dq_p); /* pop last elem */                      \
+    else FREE_CA_##type##_##CA_size(dq_p);                                           \
     return SUCCESS;                                                                  \
 }                                                                                    \
                                                                                      \
 fail_status_t popEnd_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **dq_p) { \
-    if (*dq_p == NULL) return EMPTY; /* fail on empty */                             \
+    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return EMPTY; \
     uint8_t end_index = ((*dq_p)->start_offset + (*dq_p)->size) % CAPACITY;          \
     *dest = (*dq_p)->data[end_index];                                                \
     if (!((*dq_p)->size == 0)) (*dq_p)->size--;                                      \
-    else FREE_CA_##type##_##CA_size (dq_p); /* pop last elem */                      \
+    else FREE_CA_##type##_##CA_size(dq_p);                                           \
     return SUCCESS;                                                                  \
 }                                                                                    \
 
+
+// overflow underflow
+// filled cleared
+
 DEFINE_CIRCARRAY(int, 255);
+
+DEFINE_CIRCARRAY(int, 15);
 
 /* ___________________________________________makeheaders INTERFACE */
 // makeheaders requires INTERFACE directive wrapped around Pre-Defined 
@@ -135,207 +164,316 @@ DEFINE_CIRCARRAY(int, 255);
 /* ________________________________________Function Implementations */
 /* Push X values using pushEnd_CA_int */
 
-static void printDequeState(const char *label, CA_int_255 *dq) {
-    printf("%s: size=%"PRIu8" start=%"PRIu8"\n",
-           label,
-           dq ? dq->size : 0,
-           dq ? dq->start_offset : 0);
+/* ________________________________________Function Implementations */
+
+typedef struct {
+    void **dq;   // pointer to the deque pointer (CA_int_255**, CA_int_15**, etc.)
+
+    fail_status_t (*pushStart)(void *src, void **dq);
+    fail_status_t (*pushEnd)(void *src, void **dq);
+    fail_status_t (*popStart)(void *dst, void **dq);
+    fail_status_t (*popEnd)(void *dst, void **dq);
+
+    const char *label; // for debugging
+} CA_Interface;
+
+/* Print state of deque (generic) */
+static void printDequeState(const char *label, void *dq_void) {
+    if (!dq_void) {
+        printf("%s: size=0 start=0\n", label);
+        return;
+    }
+
+    // All CA_* structs begin with uint8_t size, uint8_t start_offset
+    uint8_t size  = *((uint8_t*)dq_void);
+    uint8_t start = *(((uint8_t*)dq_void) + 1);
+
+    printf("%s: size=%"PRIu8" start=%"PRIu8"\n", label, size, start);
 }
 
-/* Push N values using pushEnd */
-static void testPushEnd(CA_int_255 **dq, int count) {
-    printf("\n[testPushEnd] pushing %d values...\n", count);
+/* __________________________________________Helper Implementations */
+
+static void testPushEnd(CA_Interface *iface, int count) {
+    printf("\n[testPushEnd %s] pushing %d values...\n",
+           iface->label, count);
+
     for (int i = 0; i < count; i++) {
         int x = i + 1;
-        fail_status_t r = pushEnd_CA_int_255(&x, dq);
+        fail_status_t r = iface->pushEnd(&x, iface->dq);
         if (r != SUCCESS) {
             printf(" pushEnd failed at i=%d (status=%d)\n", i, r);
             return;
         }
     }
-    printDequeState("After pushEnd", *dq);
+    printDequeState("After pushEnd", *(iface->dq));
 }
 
-/* Push N values using pushStart */
-static void testPushStart(CA_int_255 **dq, int count) {
-    printf("\n[testPushStart] pushing %d values...\n", count);
+static void testPushStart(CA_Interface *iface, int count) {
+    printf("\n[testPushStart %s] pushing %d values...\n",
+           iface->label, count);
+
     for (int i = 0; i < count; i++) {
         int x = i + 1;
-        fail_status_t r = pushStart_CA_int_255(&x, dq);
+        fail_status_t r = iface->pushStart(&x, iface->dq);
         if (r != SUCCESS) {
             printf(" pushStart failed at i=%d (status=%d)\n", i, r);
             return;
         }
     }
-    printDequeState("After pushStart", *dq);
+    printDequeState("After pushStart", *(iface->dq));
 }
 
-/* Pop N values using popEnd */
-static void testPopEnd(CA_int_255 **dq, int count) {
-    printf("\n[testPopEnd] popping %d values...\n", count);
+static void testPopEnd(CA_Interface *iface, int count) {
+    printf("\n[testPopEnd %s] popping %d values...\n",
+           iface->label, count);
+
     for (int i = 0; i < count; i++) {
         int x;
-        fail_status_t r = popEnd_CA_int_255(&x, dq);
+        fail_status_t r = iface->popEnd(&x, iface->dq);
         if (r != SUCCESS) {
             printf(" popEnd failed at i=%d (status=%d)\n", i, r);
             return;
         }
     }
-    printDequeState("After popEnd", *dq);
+    printDequeState("After popEnd", *(iface->dq));
 }
 
-/* Pop N values using popStart */
-static void testPopStart(CA_int_255 **dq, int count) {
-    printf("\n[testPopStart] popping %d values...\n", count);
+static void testPopStart(CA_Interface *iface, int count) {
+    printf("\n[testPopStart %s] popping %d values...\n",
+           iface->label, count);
+
     for (int i = 0; i < count; i++) {
         int x;
-        fail_status_t r = popStart_CA_int_255(&x, dq);
+        fail_status_t r = iface->popStart(&x, iface->dq);
         if (r != SUCCESS) {
             printf(" popStart failed at i=%d (status=%d)\n", i, r);
             return;
         }
     }
-    printDequeState("After popStart", *dq);
+    printDequeState("After popStart", *(iface->dq));
 }
 
-static void test2(CA_int_255 **dq) {
-    printf("\n===== TEST 2: FAIL INTENTIONALLY =====\n");
 
-    // A: push until full, then push one more
-    printf("\n[Test 2A] pushEnd until full, then extra\n");
-    for (int i = 0; i < 255; i++) {
-        int x = i;
-        pushEnd_CA_int_255(&x, dq);
-    }
-    int x = 999;
-    printf(" pushEnd beyond full -> %d\n",
-           pushEnd_CA_int_255(&x, dq));
-
-    // // B: pop from empty
-    // printf("\n[Test 2B] popStart on empty deque\n");
-    // FREE_CA_int_255_255(dq); // ensure empty
-    // printf(" popStart empty -> %d\n",
-    //        popStart_CA_int_255(&x, dq));
-
-    // // C: simulate malloc failure
-    // printf("\n[Test 2C] simulated malloc failure\n");
-    // #define MALLOC_FAIL 1
-    // printf(" pushEnd malloc fail -> %d\n",
-    //        pushEnd_CA_int_255(&x, dq));
-    // #undef MALLOC_FAIL
-
-    // D: pop more than size
-    printf("\n[Test 2D] popStart more than size\n");
-    testPushEnd(dq, 10);
-    testPopStart(dq, 15);
-
-    // E: recovery
-    printf("\n[Test 2E] recovery after failures\n");
-    x = 42;
-    pushEnd_CA_int_255(&x, dq);
-    printDequeState("After recovery push", *dq);
-
-}
 
 /* __________________________________________Helper Implementations */
 // static functions are unavailable outside the file they are defined.
 
-static void test(int argc, char **argv) {
-    CA_int_255 *dq = NULL;
-    int x;
+static void test255(int argc, char **argv) {
+    printf("\n===== RUNNING TEST255 (CA_int_255) =====\n");
+
+    /* Interface instance for CA_int_255 */
+    static CA_int_255 *dq_ptr = NULL;
+    CA_Interface iface = {
+        .dq = (void**)&dq_ptr,
+        .pushStart = (fail_status_t (*)(void*,void**))pushStart_CA_int_255,
+        .pushEnd   = (fail_status_t (*)(void*,void**))pushEnd_CA_int_255,
+        .popStart  = (fail_status_t (*)(void*,void**))popStart_CA_int_255,
+        .popEnd    = (fail_status_t (*)(void*,void**))popEnd_CA_int_255,
+        .label = "CA_int_255"
+    };
 
     printf("\n===== TEST 1a: pushEnd 200, popStart 199 =====\n");
-    testPushEnd(&dq, 200);
-    testPopStart(&dq, 199);
-    printf("Current Deque pointer: %016"PRIX64"\n", (void*)dq);
+    testPushEnd(&iface, 200);
+    testPopStart(&iface, 199);
+    printf("Current Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
 
-    testPushEnd(&dq, 200);
-    testPopStart(&dq, 200);
-    printf("Current Deque pointer: %016"PRIX64"\n", (void*)dq);
+    testPushEnd(&iface, 200);
+    testPopStart(&iface, 200);
+    printf("Current Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
 
-    testPushEnd(&dq, 255);
-    testPopStart(&dq, 255);
-    testPopStart(&dq, 1);
-    printf("Deque pointer after emptying: %016"PRIX64"\n", (void*)dq);
+    testPushEnd(&iface, 255);
+    testPopStart(&iface, 255);
+    testPopStart(&iface, 1);
+    printf("Deque pointer after emptying: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
 
     printf("\n===== TEST 1c: pushStart 200, popEnd 200 =====\n");
-    testPushStart(&dq, 200);
-    testPopEnd(&dq, 199);
-    testPushStart(&dq, 200);
-    testPopEnd(&dq, 200);
-    testPushStart(&dq, 255);
-    testPopEnd(&dq, 255);
-    testPopEnd(&dq, 1);
+    testPushStart(&iface, 200);
+    testPopEnd(&iface, 199);
+    testPushStart(&iface, 200);
+    testPopEnd(&iface, 200);
+    testPushStart(&iface, 255);
+    testPopEnd(&iface, 255);
+    testPopEnd(&iface, 1);
 
-    printf("Current Deque pointer: %016"PRIX64"\n", (void*)dq);
-    // printf("Deque pointer after emptying: %p\n", (void*)dq);
+    printf("Current Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
 
-    test2(&dq);
+    /* Test 2 (intentional failures) */
+    printf("\n===== TEST 2: FAIL INTENTIONALLY =====\n");
 
-    printf("\n===== ALL TESTS COMPLETE =====\n");
+    printf("\n[Test 2A] pushEnd until full, then extra\n");
+    for (int i = 0; i < 255; i++) {
+        int x = i;
+        iface.pushEnd(&x, iface.dq);
+    }
+    int x = 999;
+    printf(" pushEnd beyond full -> %d\n", iface.pushEnd(&x, iface.dq));
+
+    printf("\n[Test 2D] popStart more than size\n");
+    testPushEnd(&iface, 10);
+    testPopStart(&iface, 15);
+
+    printf("\n[Test 2E] recovery after failures\n");
+    x = 42;
+    iface.pushEnd(&x, iface.dq);
+    printDequeState("After recovery push", dq_ptr);
+
+    printf("\n===== MINIMAL ORDERING TEST =====\n");
+
+    CA_int_255 *dq2 = NULL;
+    CA_Interface iface2 = {
+        .dq = (void**)&dq2,
+        .pushStart = (fail_status_t (*)(void*,void**))pushStart_CA_int_255,
+        .pushEnd   = (fail_status_t (*)(void*,void**))pushEnd_CA_int_255,
+        .popStart  = (fail_status_t (*)(void*,void**))popStart_CA_int_255,
+        .popEnd    = (fail_status_t (*)(void*,void**))popEnd_CA_int_255,
+        .label = "CA_int_255"
+    };
+
+    int a = 1, b = 2, out;
+    iface2.pushEnd(&a, iface2.dq);
+    iface2.pushEnd(&b, iface2.dq);
+
+    printf("Correct behavior: popEnd should return 2 first, then 1\n");
+
+    iface2.popEnd(&out, iface2.dq);
+    printf("First popEnd returned: %d\n", out);
+
+    iface2.popEnd(&out, iface2.dq);
+    printf("Second popEnd returned: %d\n", out);
+
+    printf("Deque pointer after minimal test: %p\n", (void*)dq2);
+
+    printf("\n===== ALL TESTS COMPLETE (255) =====\n");
 }
+
+static void test16(int argc, char **argv) {
+    printf("\n===== RUNNING TEST16 (CA_int_15) =====\n");
+
+    /* Interface instance for CA_int_15 */
+    static CA_int_15 *dq_ptr = NULL;
+    CA_Interface iface = {
+        .dq = (void**)&dq_ptr,
+        .pushStart = (fail_status_t (*)(void*,void**))pushStart_CA_int_15,
+        .pushEnd   = (fail_status_t (*)(void*,void**))pushEnd_CA_int_15,
+        .popStart  = (fail_status_t (*)(void*,void**))popStart_CA_int_15,
+        .popEnd    = (fail_status_t (*)(void*,void**))popEnd_CA_int_15,
+        .label = "CA_int_15"
+    };
+
+    printf("\n===== TEST 1a: pushEnd 15, popStart 14 =====\n");
+    testPushEnd(&iface, 15);
+    testPopStart(&iface, 14);
+    printf("Current Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
+
+    /* Empty the last element */
+    testPopStart(&iface, 1);
+    printf("Deque pointer after emptying: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
+
+    printf("\n===== TEST 1b: pushEnd 15, popStart 15 =====\n");
+    testPushEnd(&iface, 15);
+    testPopStart(&iface, 14);
+    printf("Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
+
+    printf("\n===== TEST 1c: pushStart 15, popEnd 16 =====\n");
+    testPushStart(&iface, 15);
+    testPopEnd(&iface, 16);
+    printf("Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
+
+    printf("\n===== TEST 2: FAIL INTENTIONALLY =====\n");
+
+    printf("\n[Test 2A] pushEnd until full, then extra\n");
+    for (int i = 0; i < 15; i++) {
+        int x = i;
+        iface.pushEnd(&x, iface.dq);
+    }
+    int x = 999;
+    printf(" pushEnd beyond full -> %d\n", iface.pushEnd(&x, iface.dq));
+
+    printf("\n[Test 2D] popStart more than size\n");
+    testPushEnd(&iface, 10);
+    testPopStart(&iface, 15);
+
+    printf("\n[Test 2E] recovery after failures\n");
+    x = 42;
+    iface.pushEnd(&x, iface.dq);
+    printDequeState("After recovery push", dq_ptr);
+
+    printf("\n===== MINIMAL ORDERING TEST =====\n");
+
+    CA_int_15 *dq2 = NULL;
+    CA_Interface iface2 = {
+        .dq = (void**)&dq2,
+        .pushStart = (fail_status_t (*)(void*,void**))pushStart_CA_int_15,
+        .pushEnd   = (fail_status_t (*)(void*,void**))pushEnd_CA_int_15,
+        .popStart  = (fail_status_t (*)(void*,void**))popStart_CA_int_15,
+        .popEnd    = (fail_status_t (*)(void*,void**))popEnd_CA_int_15,
+        .label = "CA_int_15"
+    };
+
+    int a = 1, b = 2, out;
+    iface2.pushEnd(&a, iface2.dq);
+    iface2.pushEnd(&b, iface2.dq);
+
+    printf("Correct behavior: popEnd should return 2 first, then 1\n");
+
+    iface2.popEnd(&out, iface2.dq);
+    printf("First popEnd returned: %d\n", out);
+
+    iface2.popEnd(&out, iface2.dq);
+    printf("Second popEnd returned: %d\n", out);
+
+    printf("Deque pointer after minimal test: %p\n", (void*)dq2);
+
+    printf("\n===== ALL TESTS COMPLETE (15) =====\n");
+}
+
+
 
 /* _____________________________________________________RUN PROGRAM */
 
 int64_t main(int argc, char **argv){// *argv++ is *((char **)(argv++))
     // https://stackoverflow.com/a/72203145/144020
     // argv++; while (*argv) printf("%s ", *argv++); argv = argv - argc;
-    test( argc, argv);
+    test16( argc, argv);
+    // test255( argc, argv);
     return 0;
 }
 
 /* 
 $ gcc -m64 -O2 -std=gnu99 CATest.c -o CATest && ./CATest && rm ./CATest
 
-===== TEST 1a: pushEnd 200, popStart 199 =====
+===== RUNNING TEST16 (CA_int_15) =====
 
-[testPushEnd] pushing 200 values...
-After pushEnd: size=199 start=0
+===== TEST 1a: pushEnd 15, popStart 14 =====
 
-[testPopStart] popping 199 values...
-After popStart: size=0 start=199
-Current Deque pointer: 00005612FCBB76B0
+[testPushEnd CA_int_15] pushing 15 values...
+After pushEnd: size=14 start=0
 
-[testPushEnd] pushing 200 values...
-After pushEnd: size=200 start=199
+[testPopStart CA_int_15] popping 14 values...
+After popStart: size=0 start=14
+Current Deque pointer: 0000557C3D9B96B0
 
-[testPopStart] popping 200 values...
-After popStart: size=0 start=143
-Current Deque pointer: 00005612FCBB76B0
-
-[testPushEnd] pushing 255 values...
-After pushEnd: size=255 start=143
-
-[testPopStart] popping 255 values...
-After popStart: size=0 start=142
-
-[testPopStart] popping 1 values...
+[testPopStart CA_int_15] popping 1 values...
 After popStart: size=0 start=0
 Deque pointer after emptying: 0000000000000000
 
-===== TEST 1c: pushStart 200, popEnd 200 =====
+===== TEST 1b: pushEnd 15, popStart 15 =====
 
-[testPushStart] pushing 200 values...
-After pushStart: size=199 start=57
+[testPushEnd CA_int_15] pushing 15 values...
+After pushEnd: size=14 start=0
 
-[testPopEnd] popping 199 values...
-After popEnd: size=0 start=57
+[testPopStart CA_int_15] popping 14 values...
+After popStart: size=0 start=14
+Deque pointer: 0000557C3D9B9700
 
-[testPushStart] pushing 200 values...
-After pushStart: size=200 start=113
+===== TEST 1c: pushStart 15, popEnd 16 =====
 
-[testPopEnd] popping 200 values...
-After popEnd: size=0 start=113
+[testPushStart CA_int_15] pushing 15 values...
+After pushStart: size=15 start=15
 
-[testPushStart] pushing 255 values...
-After pushStart: size=255 start=114
-
-[testPopEnd] popping 255 values...
-After popEnd: size=0 start=114
-
-[testPopEnd] popping 1 values...
+[testPopEnd CA_int_15] popping 16 values...
 After popEnd: size=0 start=0
-Current Deque pointer: 0000000000000000
+Deque pointer: 0000000000000000
 
 ===== TEST 2: FAIL INTENTIONALLY =====
 
@@ -344,15 +482,21 @@ Current Deque pointer: 0000000000000000
 
 [Test 2D] popStart more than size
 
-[testPushEnd] pushing 10 values...
+[testPushEnd CA_int_15] pushing 10 values...
  pushEnd failed at i=0 (status=1)
 
-[testPopStart] popping 15 values...
-After popStart: size=240 start=15
+[testPopStart CA_int_15] popping 15 values...
+After popStart: size=0 start=15
 
 [Test 2E] recovery after failures
-After recovery push: size=241 start=15
+After recovery push: size=1 start=15
 
-===== ALL TESTS COMPLETE =====
+===== MINIMAL ORDERING TEST =====
+Correct behavior: popEnd should return 2 first, then 1
+First popEnd returned: 2
+Second popEnd returned: 1
+Deque pointer after minimal test: (nil)
+
+===== ALL TESTS COMPLETE (15) =====
 
  */
