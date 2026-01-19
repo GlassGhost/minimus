@@ -98,12 +98,12 @@ fail_status_t popEnd_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **d
                                                                                      \
 /* ___________________________________________Function Implementation */             \
 fail_status_t pushStart_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size **dq_p) { \
-    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) {       \
-        if (ALLOC_CA_##type##_##CA_size(dq_p)) return FULL;                          \
+    if (*dq_p == NULL) { /* push 1st = 0th elem */                                   \
+        if (ALLOC_CA_##type##_##CA_size (dq_p)) return FULL; /* alloc fail */        \
         (*dq_p)->data[0] = *source;                                                  \
         return SUCCESS;                                                              \
     }                                                                                \
-    if (is_full_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return FULL; \
+    if ((*dq_p)->size == CA_size) return FULL; /* array full */                      \
     (*dq_p)->start_offset = ((*dq_p)->start_offset + CAPACITY - 1) % CAPACITY;       \
     (*dq_p)->data[(*dq_p)->start_offset] = *source;                                  \
     (*dq_p)->size++;                                                                 \
@@ -111,12 +111,12 @@ fail_status_t pushStart_CA_##type##_##CA_size(type *source, CA_##type##_##CA_siz
 }                                                                                    \
                                                                                      \
 fail_status_t pushEnd_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size **dq_p) { \
-    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) {       \
-        if (ALLOC_CA_##type##_##CA_size(dq_p)) return FULL;                          \
+    if (*dq_p == NULL) { /* push 1st = 0th elem */                                   \
+        if (ALLOC_CA_##type##_##CA_size (dq_p)) return FULL; /* alloc fail */        \
         (*dq_p)->data[0] = *source;                                                  \
         return SUCCESS;                                                              \
     }                                                                                \
-    if (is_full_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return FULL; \
+    if ((*dq_p)->size == CA_size) return FULL; /* array full */                      \
     uint8_t end_index = ((*dq_p)->start_offset + (*dq_p)->size + 1) % CAPACITY;      \
     (*dq_p)->data[end_index] = *source;                                              \
     (*dq_p)->size++;                                                                 \
@@ -124,23 +124,23 @@ fail_status_t pushEnd_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size 
 }                                                                                    \
                                                                                      \
 fail_status_t popStart_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **dq_p) { \
-    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return EMPTY; \
+    if (*dq_p == NULL) return EMPTY; /* fail on empty */                             \
     *dest = (*dq_p)->data[(*dq_p)->start_offset];                                    \
     (*dq_p)->start_offset = ((*dq_p)->start_offset + 1) % CAPACITY;                  \
     if (!((*dq_p)->size == 0)) (*dq_p)->size--;                                      \
-    else FREE_CA_##type##_##CA_size(dq_p);                                           \
+    else FREE_CA_##type##_##CA_size (dq_p); /* pop last elem */                      \
     return SUCCESS;                                                                  \
 }                                                                                    \
                                                                                      \
 fail_status_t popEnd_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **dq_p) { \
-    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return EMPTY; \
+    if (*dq_p == NULL) return EMPTY; /* fail on empty */                             \
     uint8_t end_index = ((*dq_p)->start_offset + (*dq_p)->size) % CAPACITY;          \
     *dest = (*dq_p)->data[end_index];                                                \
     if (!((*dq_p)->size == 0)) (*dq_p)->size--;                                      \
-    else FREE_CA_##type##_##CA_size(dq_p);                                           \
+    else FREE_CA_##type##_##CA_size (dq_p); /* pop last elem */                      \
     return SUCCESS;                                                                  \
 }                                                                                    \
-
+                                                                                     \
 
 // overflow underflow
 // filled cleared
