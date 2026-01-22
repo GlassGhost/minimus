@@ -1,4 +1,4 @@
-// #!/run/current-system/sw/bin/tcc -run
+#!/run/current-system/sw/bin/tcc -run
 
 // Copyright (C) 2023-2025 Roy Pfund. All rights reserved.
 //
@@ -21,13 +21,7 @@
 // WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING  FROM,
 // OUT OF OR IN CONNECTION WITH THE  SOFTWARE  OR  THE  USE  OR  OTHER
 // DEALINGS IN THE SOFTWARE.
-
-/* build, run, and destroy with:
-gcc -m64 -O2 -std=gnu99 CATest.c -o CATest && ./CATest && rm ./CATest
-
-or just uncomment the tcc shebang
-*/
-
+//
 // Annex B (informative)_Library_summary____________________ [p419N1256]
 // assert inttypes signal  stdlib complex iso646 stdarg string
 // ctype  limits   stdbool tgmath errno   locale stddef time
@@ -38,116 +32,24 @@ or just uncomment the tcc shebang
 // Signed   // %"PRIi8"   // %"PRIi16"   // %"PRIi32"   // %"PRIi64"
 // Unsigned // %"PRIu8"   // %"PRIu16"   // %"PRIu32"   // %"PRIu64"
 // Float    //  XXXXXX    //   XXXXXX    //   %.6E      // %.15E
+//
+/*////////////////////////////////////////////////////////////////////
+gcc -m64 -O2 -std=gnu99 CATest.c -o CATest && ./CATest && rm ./CATest
 
-typedef enum { SUCCESS = 0, FULL = 1, EMPTY = 2, MALLOC_FAIL = 3 } fail_status_t;
+build, run, and destroy with the above; or just uncomment the tcc shebang.
+//////////////////////////////////////////////////////////////////////
 
-#define DEFINE_CIRCARRAY_MEM(type, CA_size, CAPACITY)                                  \
-/*_____ ___________________________________________Helper_Functions */                 \
-static inline bool is_empty_CA_##type##_##CA_size(const CA_##type##_##CA_size **dq_p) { \
-    return (*dq_p == NULL);                                                            \
-}                                                                                      \
-static inline bool is_full_CA_##type##_##CA_size(const CA_##type##_##CA_size **dq_p) { \
-    return ((*dq_p)->size == CA_size);                                                 \
-}                                                                                      \
-static inline fail_status_t Ful_Emp_CA_##type##_##CA_size(                             \
-        type *dest, CA_##type##_##CA_size **dq_p) {                                    \
-    if (*dq_p == NULL) return EMPTY;                                                   \
-    if ((*dq_p)->size == CA_size) return FULL;                                         \
-    return SUCCESS; /* Otherwise neither full nor empty */                             \
-}                                                                                      \
-inline void FREE_CA_##type##_##CA_size ( CA_##type##_##CA_size **dq_p ){               \
-    free(*dq_p); *dq_p = NULL;                                                         \
-}                                                                                      \
-inline bool ALLOC_CA_##type##_##CA_size ( CA_##type##_##CA_size **dq_p ){              \
-    *dq_p = calloc(1, sizeof(CA_##type##_##CA_size));                                  \
-    if (!(*dq_p)) return MALLOC_FAIL; else return false;                               \
-}
+Circular Array Test
 
-/*
- * CIRCARRAY EMPTY SIZE ENCODING:
- *   dq == NULL → 0 elements
- *   dq->size is an encoded count where:
- *       size = 0 → 1 element
- *       size = 1 → 2 elements
- *       ...
- *       size = 255 → 256 elements
- *   Therefore, ONLY a NULL pointer means empty.
- */
+*/////////////////////////////////////////////////////////////////////
 
-#define DEFINE_CIRCARRAY(type, CA_size)              \
-DEFINE_CIRCARRAY_STRUCTS(type, CA_size, (CA_size+1)) \
-DEFINE_CIRCARRAY_MEM(type, CA_size, (CA_size+1))     \
-DEFINE_CIRCARRAY_FUNCS(type, CA_size, (CA_size+1))
+#define type int
+#define CA_size 63
+#include "ca_type.h"
 
-#define DEFINE_CIRCARRAY_STRUCTS(type, CA_size, CAPACITY)                            \
-                                                                                     \
-/* _________________________________________________Data Structures */               \
-typedef struct { /* % modulo CAPACITY gives 0 to CA_size = (CAPACITY-1) */           \
-    uint8_t size; /* 0..255 means 1 to 256 elements, NULL for 0 elements */          \
-    uint8_t start_offset; /* only start-ops modify start_offset 0 to 255 */          \
-    type data[CAPACITY];                                                             \
-} CA_##type##_##CA_size;                                                             \
-
-#define DEFINE_CIRCARRAY_FUNCS(type, CA_size, CAPACITY)                              \
-                                                                                     \
-/* ___________________________________________Function Declarations */               \
-fail_status_t pushStart_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size **dq_p); \
-fail_status_t pushEnd_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size **dq_p);   \
-fail_status_t popStart_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **dq_p);    \
-fail_status_t popEnd_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **dq_p);      \
-                                                                                     \
-/* ___________________________________________Function Implementation */             \
-fail_status_t pushStart_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size **dq_p) { \
-    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) {       \
-        if (ALLOC_CA_##type##_##CA_size(dq_p)) return FULL;                          \
-        (*dq_p)->data[0] = *source; /* push 1st = 0th elem */                        \
-        return SUCCESS;                                                              \
-    }                                                                                \
-    if (is_full_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return FULL; \
-    (*dq_p)->start_offset = ((*dq_p)->start_offset + CAPACITY - 1) % CAPACITY;       \
-    (*dq_p)->data[(*dq_p)->start_offset] = *source;                                  \
-    (*dq_p)->size++;                                                                 \
-    return SUCCESS;                                                                  \
-}                                                                                    \
-                                                                                     \
-fail_status_t pushEnd_CA_##type##_##CA_size(type *source, CA_##type##_##CA_size **dq_p) { \
-    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) {       \
-        if (ALLOC_CA_##type##_##CA_size(dq_p)) return FULL;                          \
-        (*dq_p)->data[0] = *source;                                                  \
-        return SUCCESS;                                                              \
-    }                                                                                \
-    if (is_full_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return FULL; \
-    uint8_t end_index = ((*dq_p)->start_offset + (*dq_p)->size + 1) % CAPACITY;      \
-    (*dq_p)->data[end_index] = *source;                                              \
-    (*dq_p)->size++;                                                                 \
-    return SUCCESS;                                                                  \
-}                                                                                    \
-                                                                                     \
-fail_status_t popStart_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **dq_p) { \
-    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return EMPTY; \
-    *dest = (*dq_p)->data[(*dq_p)->start_offset];                                    \
-    (*dq_p)->start_offset = ((*dq_p)->start_offset + 1) % CAPACITY;                  \
-    if (!((*dq_p)->size == 0)) (*dq_p)->size--;                                      \
-    else FREE_CA_##type##_##CA_size (dq_p); /* pop last elem */                      \
-    return SUCCESS;                                                                  \
-}                                                                                    \
-                                                                                     \
-fail_status_t popEnd_CA_##type##_##CA_size(type *dest, CA_##type##_##CA_size **dq_p) { \
-    if (is_empty_CA_##type##_##CA_size((const CA_##type##_##CA_size**)dq_p)) return EMPTY; \
-    uint8_t end_index = ((*dq_p)->start_offset + (*dq_p)->size) % CAPACITY;          \
-    *dest = (*dq_p)->data[end_index];                                                \
-    if (!((*dq_p)->size == 0)) (*dq_p)->size--;                                      \
-    else FREE_CA_##type##_##CA_size (dq_p); /* pop last elem */                      \
-    return SUCCESS;                                                                  \
-}                                                                                    \
-
-
-// overflow underflow
-// filled cleared
-
-DEFINE_CIRCARRAY(int, 255);
-
-DEFINE_CIRCARRAY(int, 15);
+#define type int
+#define CA_size 255
+#include "ca_type.h"
 
 /* ___________________________________________makeheaders INTERFACE */
 // makeheaders requires INTERFACE directive wrapped around Pre-Defined 
@@ -165,17 +67,6 @@ DEFINE_CIRCARRAY(int, 15);
 /* Push X values using pushEnd_CA_int */
 
 /* ________________________________________Function Implementations */
-
-typedef struct {
-    void **dq;   // pointer to the deque pointer (CA_int_255**, CA_int_15**, etc.)
-
-    fail_status_t (*pushStart)(void *src, void **dq);
-    fail_status_t (*pushEnd)(void *src, void **dq);
-    fail_status_t (*popStart)(void *dst, void **dq);
-    fail_status_t (*popEnd)(void *dst, void **dq);
-
-    const char *label; // for debugging
-} CA_Interface;
 
 /* Print state of deque (generic) */
 static void printDequeState(const char *label, void *dq_void) {
@@ -310,7 +201,7 @@ static void test255(int argc, char **argv) {
 
     printf("\n[Test 2D] popStart more than size\n");
     testPushEnd(&iface, 10);
-    testPopStart(&iface, 15);
+    testPopStart(&iface, 63);
 
     printf("\n[Test 2E] recovery after failures\n");
     x = 42;
@@ -346,134 +237,140 @@ static void test255(int argc, char **argv) {
     printf("\n===== ALL TESTS COMPLETE (255) =====\n");
 }
 
-static void test16(int argc, char **argv) {
-    printf("\n===== RUNNING TEST16 (CA_int_15) =====\n");
-
-    /* Interface instance for CA_int_15 */
-    static CA_int_15 *dq_ptr = NULL;
+static void test63(int argc, char **argv) {
+    printf("\n===== RUNNING TEST63 (CA_int_63) =====\n");
+    /* Interface instance for CA_int_63 */
+    static CA_int_63 *dq_ptr = NULL;
     CA_Interface iface = {
         .dq = (void**)&dq_ptr,
-        .pushStart = (fail_status_t (*)(void*,void**))pushStart_CA_int_15,
-        .pushEnd   = (fail_status_t (*)(void*,void**))pushEnd_CA_int_15,
-        .popStart  = (fail_status_t (*)(void*,void**))popStart_CA_int_15,
-        .popEnd    = (fail_status_t (*)(void*,void**))popEnd_CA_int_15,
-        .label = "CA_int_15"
+        .pushStart = (fail_status_t (*)(void*,void**))pushStart_CA_int_63,
+        .pushEnd = (fail_status_t (*)(void*,void**))pushEnd_CA_int_63,
+        .popStart = (fail_status_t (*)(void*,void**))popStart_CA_int_63,
+        .popEnd = (fail_status_t (*)(void*,void**))popEnd_CA_int_63,
+        .label = "CA_int_63"
     };
-
-    printf("\n===== TEST 1a: pushEnd 15, popStart 14 =====\n");
-    testPushEnd(&iface, 15);
-    testPopStart(&iface, 14);
+    printf("\n===== TEST 1a: pushEnd 50, popStart 49 =====\n");
+    testPushEnd(&iface, 50);
+    testPopStart(&iface, 49);
     printf("Current Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
-
-    /* Empty the last element */
+    testPushEnd(&iface, 50);
+    testPopStart(&iface, 50);
+    printf("Current Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
+    testPushEnd(&iface, 63);
+    testPopStart(&iface, 63);
     testPopStart(&iface, 1);
     printf("Deque pointer after emptying: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
-
-    printf("\n===== TEST 1b: pushEnd 15, popStart 15 =====\n");
-    testPushEnd(&iface, 15);
-    testPopStart(&iface, 14);
-    printf("Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
-
-    printf("\n===== TEST 1c: pushStart 15, popEnd 16 =====\n");
-    testPushStart(&iface, 15);
-    testPopEnd(&iface, 16);
-    printf("Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
-
+    printf("\n===== TEST 1c: pushStart 50, popEnd 50 =====\n");
+    testPushStart(&iface, 50);
+    testPopEnd(&iface, 49);
+    testPushStart(&iface, 50);
+    testPopEnd(&iface, 50);
+    testPushStart(&iface, 63);
+    testPopEnd(&iface, 63);
+    testPopEnd(&iface, 1);
+    printf("Current Deque pointer: %016"PRIX64"\n", (uint64_t)(uintptr_t)dq_ptr);
+    /* Test 2 (intentional failures) */
     printf("\n===== TEST 2: FAIL INTENTIONALLY =====\n");
-
     printf("\n[Test 2A] pushEnd until full, then extra\n");
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < 63; i++) {
         int x = i;
         iface.pushEnd(&x, iface.dq);
     }
     int x = 999;
     printf(" pushEnd beyond full -> %d\n", iface.pushEnd(&x, iface.dq));
-
     printf("\n[Test 2D] popStart more than size\n");
     testPushEnd(&iface, 10);
-    testPopStart(&iface, 15);
-
+    testPopStart(&iface, 16);
     printf("\n[Test 2E] recovery after failures\n");
     x = 42;
     iface.pushEnd(&x, iface.dq);
     printDequeState("After recovery push", dq_ptr);
-
     printf("\n===== MINIMAL ORDERING TEST =====\n");
-
-    CA_int_15 *dq2 = NULL;
+    CA_int_63 *dq2 = NULL;
     CA_Interface iface2 = {
         .dq = (void**)&dq2,
-        .pushStart = (fail_status_t (*)(void*,void**))pushStart_CA_int_15,
-        .pushEnd   = (fail_status_t (*)(void*,void**))pushEnd_CA_int_15,
-        .popStart  = (fail_status_t (*)(void*,void**))popStart_CA_int_15,
-        .popEnd    = (fail_status_t (*)(void*,void**))popEnd_CA_int_15,
-        .label = "CA_int_15"
+        .pushStart = (fail_status_t (*)(void*,void**))pushStart_CA_int_63,
+        .pushEnd = (fail_status_t (*)(void*,void**))pushEnd_CA_int_63,
+        .popStart = (fail_status_t (*)(void*,void**))popStart_CA_int_63,
+        .popEnd = (fail_status_t (*)(void*,void**))popEnd_CA_int_63,
+        .label = "CA_int_63"
     };
-
     int a = 1, b = 2, out;
     iface2.pushEnd(&a, iface2.dq);
     iface2.pushEnd(&b, iface2.dq);
-
     printf("Correct behavior: popEnd should return 2 first, then 1\n");
-
     iface2.popEnd(&out, iface2.dq);
     printf("First popEnd returned: %d\n", out);
-
     iface2.popEnd(&out, iface2.dq);
     printf("Second popEnd returned: %d\n", out);
-
     printf("Deque pointer after minimal test: %p\n", (void*)dq2);
-
-    printf("\n===== ALL TESTS COMPLETE (15) =====\n");
+    printf("\n===== ALL TESTS COMPLETE (63) =====\n");
 }
-
-
 
 /* _____________________________________________________RUN PROGRAM */
 
 int64_t main(int argc, char **argv){// *argv++ is *((char **)(argv++))
     // https://stackoverflow.com/a/72203145/144020
     // argv++; while (*argv) printf("%s ", *argv++); argv = argv - argc;
-    test16( argc, argv);
-    // test255( argc, argv);
+    test63( argc, argv);
+    test255( argc, argv);
     return 0;
 }
 
 /* 
 $ gcc -m64 -O2 -std=gnu99 CATest.c -o CATest && ./CATest && rm ./CATest
 
-===== RUNNING TEST16 (CA_int_15) =====
+===== RUNNING TEST255 (CA_int_255) =====
 
-===== TEST 1a: pushEnd 15, popStart 14 =====
+===== TEST 1a: pushEnd 200, popStart 199 =====
 
-[testPushEnd CA_int_15] pushing 15 values...
-After pushEnd: size=14 start=0
+[testPushEnd CA_int_255] pushing 200 values...
+After pushEnd: size=199 start=0
 
-[testPopStart CA_int_15] popping 14 values...
-After popStart: size=0 start=14
-Current Deque pointer: 0000557C3D9B96B0
+[testPopStart CA_int_255] popping 199 values...
+After popStart: size=0 start=199
+Current Deque pointer: 000055D47884C6B0
 
-[testPopStart CA_int_15] popping 1 values...
+[testPushEnd CA_int_255] pushing 200 values...
+After pushEnd: size=200 start=199
+
+[testPopStart CA_int_255] popping 200 values...
+After popStart: size=0 start=143
+Current Deque pointer: 000055D47884C6B0
+
+[testPushEnd CA_int_255] pushing 255 values...
+After pushEnd: size=255 start=143
+
+[testPopStart CA_int_255] popping 255 values...
+After popStart: size=0 start=142
+
+[testPopStart CA_int_255] popping 1 values...
 After popStart: size=0 start=0
 Deque pointer after emptying: 0000000000000000
 
-===== TEST 1b: pushEnd 15, popStart 15 =====
+===== TEST 1c: pushStart 200, popEnd 200 =====
 
-[testPushEnd CA_int_15] pushing 15 values...
-After pushEnd: size=14 start=0
+[testPushStart CA_int_255] pushing 200 values...
+After pushStart: size=199 start=57
 
-[testPopStart CA_int_15] popping 14 values...
-After popStart: size=0 start=14
-Deque pointer: 0000557C3D9B9700
+[testPopEnd CA_int_255] popping 199 values...
+After popEnd: size=0 start=57
 
-===== TEST 1c: pushStart 15, popEnd 16 =====
+[testPushStart CA_int_255] pushing 200 values...
+After pushStart: size=200 start=113
 
-[testPushStart CA_int_15] pushing 15 values...
-After pushStart: size=15 start=15
+[testPopEnd CA_int_255] popping 200 values...
+After popEnd: size=0 start=113
 
-[testPopEnd CA_int_15] popping 16 values...
+[testPushStart CA_int_255] pushing 255 values...
+After pushStart: size=255 start=114
+
+[testPopEnd CA_int_255] popping 255 values...
+After popEnd: size=0 start=114
+
+[testPopEnd CA_int_255] popping 1 values...
 After popEnd: size=0 start=0
-Deque pointer: 0000000000000000
+Current Deque pointer: 0000000000000000
 
 ===== TEST 2: FAIL INTENTIONALLY =====
 
@@ -482,14 +379,14 @@ Deque pointer: 0000000000000000
 
 [Test 2D] popStart more than size
 
-[testPushEnd CA_int_15] pushing 10 values...
+[testPushEnd CA_int_255] pushing 10 values...
  pushEnd failed at i=0 (status=1)
 
-[testPopStart CA_int_15] popping 15 values...
-After popStart: size=0 start=15
+[testPopStart CA_int_255] popping 63 values...
+After popStart: size=192 start=63
 
 [Test 2E] recovery after failures
-After recovery push: size=1 start=15
+After recovery push: size=193 start=63
 
 ===== MINIMAL ORDERING TEST =====
 Correct behavior: popEnd should return 2 first, then 1
@@ -497,6 +394,6 @@ First popEnd returned: 2
 Second popEnd returned: 1
 Deque pointer after minimal test: (nil)
 
-===== ALL TESTS COMPLETE (15) =====
+===== ALL TESTS COMPLETE (255) =====
 
  */
